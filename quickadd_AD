@@ -1,0 +1,64 @@
+##Importing AD module
+Import-Module activeDirectory
+
+
+#Prompt to get the filepath of CSV file
+$filepath = Read-Host -Prompt "Type the path of the CSV file here"
+
+#Import the CSV file into a variable
+$users = Import-Csv $filepath
+
+
+#Loop through each row of CSV file to gather info
+ForEach ($user in $users) {
+
+    $lname = $user.'Last Name'
+    $fname = $user.'First Name'
+    $abc123 = $user.'Banner ID'
+    $groupName = $user.'Group Name'
+    $logonUName= "$fname.$lname"
+    
+
+    
+
+### Creates new group from the 'Group Name'column if it does not already exist ##
+if (Get-ADGroup -F {SamAccountName -eq $groupName})
+{
+  #write-Warning "The Group name '$groupName' already exists."
+}
+else
+{
+  Write-Host "Group '$groupName' has been created"
+  New-ADGroup -Name $groupName -GroupScope Global -GroupCategory Security -Path "OU=CSL-Students,DC=CSL,DC=<school>,DC=edu"
+}
+
+   
+    
+### Creates new user from .csv if the user don't exist
+if (Get-ADUser -F {SamAccountName -eq $logonUName})
+{
+
+Write-Warning "The student account for $logonUName is already in the Active Directory."
+}
+else {
+#Create unique password
+$BeginPassword= "<enter password>"
+$EndPassword= $lname
+$newPassword= $BeginPassword + $EndPassword
+    
+#Create new AD user for each user in CSV file
+
+New-ADUser -Name "$fname $lname" -GivenName $fname -Surname $lname -UserPrincipalName "$fname.$lname@domain.edu" -SamAccountName $logonUName -Path "OU=CSL-Students,DC=CSL,DC=<school>,DC=edu"-AccountPassword (convertto-securestring $newPassword -AsPlainText -Force) -ChangePasswordAtLogon $True -Enabled $True
+
+## Add users to the group
+Add-ADGroupMember -Identity $groupName -Members $logonUName
+
+Write-Host "User '$logonUName' added to the group '$groupname'."
+
+#END OF ELSE LOOP
+
+ 
+
+}#END FOREACH LOOP
+}
+
